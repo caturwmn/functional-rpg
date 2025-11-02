@@ -8,12 +8,12 @@ import Miso.Lens
 -- | Component model state
 data Model
   = Model
-  { _dialog :: String, 
-  _currentScenario :: Scenario
+  { _event :: Event
+  , _currentScenario :: Scenario
   } deriving (Show, Eq)
 
-dialog :: Lens Model String
-dialog = lens _dialog $ \record field -> record { _dialog = field }
+event :: Lens Model Event
+event = lens _event $ \record field -> record { _event = field }
 
 currentScenario :: Lens Model Scenario
 currentScenario = lens _currentScenario $ \record field -> record { _currentScenario = field }
@@ -21,39 +21,62 @@ currentScenario = lens _currentScenario $ \record field -> record { _currentScen
 -- | App events
 data Action
   = Next
+  | Choose String
   deriving (Show, Eq)
 
   -- | Empty application state
 emptyModel :: Model
-emptyModel = Model "" scenario
+emptyModel = Model (checkEvent greeting) greeting
 
 -- | Updates model, optionally introduces side effects
 updateModel :: Action -> Transition Model Action
 updateModel = \case
   Next        -> do
-    s <- use currentScenario
-    dialog .= checkEvent s
-    currentScenario .= (iterateScenario s)
+    scenario <- use currentScenario
+    currentScenario .= iterateScenario scenario
+    nextScenario <- use currentScenario
+    event .= checkEvent nextScenario
+
+  Choose selection-> do
+    choice <- use event
+    currentScenario .= choiceSelection choice selection
+    nextScenario <- use currentScenario
+    event .= checkEvent nextScenario
 
 data Event
-  = Dialog String String
+  = Dialog String String 
+  | Choice String Scenario String Scenario
   deriving (Show, Eq)
 
-getEvent :: Event -> String
-getEvent (Dialog speaker sentence) = sentence
+choiceSelection :: Event -> String -> Scenario
+choiceSelection (Choice opt1 left opt2 right) selection 
+  = case selection of
+    "Left" -> left
+    "Right" -> right
 
 data Scenario
   = Scenario [Event]
   deriving (Show, Eq)
 
-checkEvent :: Scenario -> String
-checkEvent (Scenario (x:_)) = getEvent x
+checkEvent :: Scenario -> Event
+checkEvent (Scenario (x:_)) = x
 
 iterateScenario :: Scenario -> Scenario
 iterateScenario (Scenario (x:xs)) = Scenario xs
 iterateScenario (Scenario []) = Scenario []
 
-scenario = Scenario 
+greeting = Scenario 
   [ Dialog "A" "Hello"
   , Dialog "A" "Welcome!" 
+  , Choice "Me?" left "..." right
+  ]
+
+left = Scenario 
+  [ Dialog "A" "Yes, i'm calling you"
+  , Dialog "Leif" "Why?" 
+  ]
+
+right = Scenario 
+  [ Dialog "A" "Are you ignoring me?"
+  , Dialog "Leif" "Oh, i don't know your talking to me"
   ]

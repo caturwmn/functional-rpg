@@ -62,7 +62,7 @@ executable functional-rpg
 
     -- Other library packages from which modules are imported.
     build-depends:    
-        base, miso
+        base, miso, random, raw-strings-qq
 
     -- Directories containing source files.
     hs-source-dirs:   

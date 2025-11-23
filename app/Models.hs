@@ -3,8 +3,11 @@
 module Models where
 
 import System.Random
+import Control.Monad.RWS (put)
 import Miso
 import Miso.Lens
+import Miso.Effect (scheduleIO, (<#))
+import qualified Miso.Effect as Effect
 
 -- | Component model state
 data Model
@@ -67,48 +70,108 @@ emptyModel gen = Model (checkEvent greeting) greeting
   False False "" "" (Player emptyStat) [] gen
 
 -- | Updates model, optionally introduces side effects
-updateModel :: Action -> Transition Model Action
-updateModel = \case
-  Next        -> do
-    scenario <- use currentScenario
-    currentScenario .= iterateScenario scenario
-    nextScenario <- use currentScenario
-    event .= checkEvent nextScenario
+updateModel :: Action -> Model -> Effect Model Action
+updateModel action model = 
+  case action of
+    Next        ->
+      let
+        scenario = model ^. currentScenario 
+      in put $
+        model
+          & set currentScenario (iterateScenario scenario)
+          & set event (checkEvent (model ^. currentScenario))
 
-  Choose selection -> do
-    choice <- use event
-    currentScenario .= choiceSelection choice selection
-    nextScenario <- use currentScenario
-    event .= checkEvent nextScenario
+    Choose selection ->
+      let  
+        choice = model ^. event
+      in put &
+        model
+          & set currentScenario (choiceSelection choice selection)
+          & set event (checkEvent (model ^. currentScenario))
 
-  InitiateCombat -> do
-    isCombatInitiated .= True
+    InitiateCombat -> 
+      let
+        (CombatEvent currentCombat winScenario loseScenario)
+          = model ^. event
+      in put $
+        model
+          & set isCombatInitiated True
+          & set combatStatus currentCombat
+          & set combatOrder (buildTurnOrder currentCombat)
+          & set isPlayerTurn True
+
+    PerformAttack attackName targetName ->
+      model & \m ->
+        let
+          order = model ^. combatOrder
+
+
+      order <- use combatOrder
+      combatOrder .= cycleList order
+      combatInfo .= "Used " ++ attackName ++ " on " ++ targetName
+      combatStatus %= (>>= (
+        attack targetName (getMove attackName moveList)
+        ))
+      isPlayerTurn .= False
+      case (checkCombat currentStatus) of
+        "Continue" -> pure (scheduleEvent (processTurn (cycleList order)))
+        "Win" -> pure (scheduleEvent (exitCombat "Win"))
+        "Lose" -> pure (scheduleEvent ( exitCombat "Lose"))
+
+    ProcessTurn -> do
+      case (checkCombat currentStatus) of
+        "Continue" -> do
+          order <- use combatOrder
+          processTurn order
+        "Win" -> 
+          exitCombat "Win"
+        "Lose" -> 
+          exitCombat "Lose"
+
+    ChangeInfo msg -> do
+      combatInfo .= msg
+
+    SelectSkill skill -> do
+      selectedSkill .= skill
+
+scheduleEvent :: Transition Model () -> Transition Model ()
+scheduleEvent action =
+  zoom self $
+    (<#) do
+      -- Delay by 2 seconds
+      scheduleIO 2000
+      pure (action)
+
+exitCombat :: String -> Transition Model ()
+exitCombat result
+  = do
     currentEvent <- use event
     let (CombatEvent currentCombat winScenario loseScenario) = currentEvent
-    combatStatus .= currentCombat
-    -- event .= (Choice "" "" "win" winScenario "lose" loseScenario)
-    combatOrder .= buildTurnOrder currentCombat
-    isPlayerTurn .= True
-
-  PerformAttack attack target -> do
-    combatInfo .= "attempt to use " ++ attack ++ " on " ++ target
-
-  ChangeInfo msg -> do
-    combatInfo .= msg
-
-  SelectSkill skill -> do
-    selectedSkill .= skill
+    isCombatInitiated .= False
+    case result of
+        "Win" -> pure (currentScenario .= winScenario)
+        "Lose" -> pure (currentScenario .= loseScenario)
 
 processTurn :: [Combat Stat] -> Transition Model ()
-processTurn (x@(Player _):xs) = pure ()
-processTurn order@(x@(Enemy (Stat _ _ _ moves _)):xs)
-  = do
-    gen <- use randomGen
-    let (randDouble, newRandomGen) = random gen :: (Double, StdGen)
-    randomGen .= newRandomGen
-    combatStatus %= (>>= (attack "player" bite))
-    processTurn (cycleList order)
+processTurn (x@(Player _):xs) 
+  = do 
+    pure (isPlayerTurn .= True)
 
+processTurn order
+  = do
+    gen <- use randomGen 
+    -- Get a random Double between 0 and 1
+    let (randDouble, newRandomGen) = random gen :: (Double, StdGen)
+    -- gen is the used StdGen and new StdGen is in newRandomGen
+    randomGen .= newRandomGen
+    combatStatus %= (>>= (
+      attack "player" (getMove (selectRandomly randDouble moves) moveList)
+      ))
+    currentStatus <- use combatStatus
+    case (checkCombat currentStatus) of
+      "Continue" -> pure (scheduleEvent (processTurn (cycleList order)))
+      "Win" -> pure (scheduleEvent (exitCombat "Win"))
+      "Lose" -> pure (scheduleEvent ( exitCombat "Lose"))
 
 ------------------------------UTIL-----------------------------------
 selectRandomly :: Double -> [a] -> a
@@ -122,6 +185,17 @@ cycleList (x:xs) = xs ++ [x]
 getHead :: [a] -> a
 getHead (x:_) = x
 -----------------------------COMBAT----------------------------------
+
+-- | Data for list of move
+data MoveList
+  = MoveElement String Move
+  | MoveList [MoveList]
+  deriving (Show, Eq)
+
+getMove :: String -> MoveList -> Move
+getMove name ((MoveElement moveName move):xs)
+  | name == moveName = move
+  | otherwise = (getMove name xs)
 
 -- | Data for status effect
 data StatusEffect
@@ -188,8 +262,8 @@ checkCombat :: (Combat Stat) -> String
 checkCombat (Combat player enemies) 
   = case ((checkLose player) + (checkWin enemies)) of
     0 -> "Continue" -- Continue battle
-    1 -> "Right" -- Lose
-    _ -> "Left" -- Win
+    1 -> "Lose" -- Lose
+    _ -> "Win" -- Win
 
 checkLose :: (Combat Stat) -> Integer
 checkLose (Player _) = 0
@@ -290,9 +364,9 @@ mark = DamageStatus "mark" "All" 1.5
 vulnerable = DamageStatus "vulnerable" "All" 2.0
 cureMark = StatusCleanse "mark" 
 
+-- Moves
 slash = Attack "slash" "slash" [] 5.0
 shieldStrike = Attack "shield strike" "slash" [vulnerable] 8.0
-recoil = Attack "recoil" "null" [vulnerable] 0.0
 shoot = Attack "shoot" "pierce" [] 4.0
 bite = Attack "bite" "pierce" [mark] 3.0
 
@@ -305,3 +379,11 @@ enemy2 = Enemy (Stat "wolf 2" 10 [] ["bite"] "static/wolf.png")
 
 combatScenario :: Combat Stat
 combatScenario = Combat player [enemy, enemy2]
+
+moveList :: MoveList
+moveList = 
+  [ MoveElement slash
+  , MoveElement shieldStrike
+  , MoveElement shoot
+  , MoveElement bite
+  ]

@@ -118,7 +118,12 @@ chooseSection m =
           , H.div_ [P.className "bottom-box", CSS.styleInline_ "display:flex;"] 
             [ H.div_ [P.className "skill-box"] 
               (buildSkills (_isPlayerTurn m) (_selectedSkill m) moves)
-            , H.div_ [P.className "info-box"] 
+            , H.div_ 
+              (computeAccess (not isPlayerTurn) 
+                [P.className "info-box"
+                , H.onClick ProcessTurn
+                ]
+              )
               [ H.p_ [P.className "texts"] [text $ ms name]
               , H.br_ []
               , H.p_ [P.className "texts"] [text $ ms ("HP: "  ++ (show hp))]

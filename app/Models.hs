@@ -103,20 +103,25 @@ updateModel action model =
     PerformAttack attackName targetName ->
       model & \m ->
         let
-          order = model ^. combatOrder
-
-
-      order <- use combatOrder
-      combatOrder .= cycleList order
-      combatInfo .= "Used " ++ attackName ++ " on " ++ targetName
-      combatStatus %= (>>= (
-        attack targetName (getMove attackName moveList)
-        ))
-      isPlayerTurn .= False
-      case (checkCombat currentStatus) of
-        "Continue" -> pure (scheduleEvent (processTurn (cycleList order)))
-        "Win" -> pure (scheduleEvent (exitCombat "Win"))
-        "Lose" -> pure (scheduleEvent ( exitCombat "Lose"))
+          nextOrder = cycleList (model ^. combatOrder)
+          newCombatStatus 
+            = (model ^. combatStatus) 
+              >>= (attack targetName (getMove attackName moveList))
+          statusCheck = checkCombat newCombatStatus
+          newModel = m 
+            { combatOrder = nextOrder
+            , combatInfo = "Used " ++ attackName ++ " on " ++ targetName
+            , combatStatus = newCombatStatus
+            , isPlayerTurn = False
+            }
+        in
+          case statusCheck of
+            "Continue" -> 
+              newModel <# [ scheduleEvent (processTurn (cycleList order)) ]
+            "Win" -> 
+              newModel <# [ scheduleEvent (exitCombat "Win") ]
+            "Lose" -> 
+              newModel <# [ scheduleEvent ( exitCombat "Lose") ]
 
     ProcessTurn -> do
       case (checkCombat currentStatus) of

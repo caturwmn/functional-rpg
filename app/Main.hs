@@ -12,9 +12,12 @@ import Models
   , updateModel 
   )
 
--- | `component` takes as arguments the initial model, update function, view function
+-- | `component` takes as arguments the initial model, 
+-- | update function, and view function
 main :: IO ()
 main = do
+  -- | getStdGen is used to perform random calculations and must be
+  -- | setup inside of IO. 
   gen <- getStdGen
   let initialModel = emptyModel gen
   run (startApp (component initialModel updateModel viewModel))

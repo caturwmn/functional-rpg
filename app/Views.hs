@@ -16,6 +16,7 @@ import Models
     , _isPlayerTurn
     , _combatInfo 
     , _selectedSkill
+    , _combatStatus
     )
   , Event ( Dialog, Choice, CombatEvent)
   , Action 
@@ -26,6 +27,7 @@ import Models
     , ProcessTurn
     , SelectSkill
     , PerformAttack
+    , AccelerateTurn
     )
   , Combat 
     ( Combat
@@ -92,7 +94,7 @@ chooseSection m =
         ]
       ]
 
-    CombatEvent combat@(Combat (Player (Stat name hp _ moves _)) enemies) _ _ ->
+    CombatEvent _ _ _ ->
       case (_isCombatInitiated m) of
         False ->
           [ H.div_ [P.className "combat-alert", H.onClick InitiateCombat]
@@ -113,28 +115,50 @@ chooseSection m =
             ]
           ]
         True ->
-          [ H.div_ [P.className "enemy-space"] 
-            (buildEnemyBox (_isPlayerTurn m) (_selectedSkill m) enemies)
-          , H.div_ [P.className "bottom-box", CSS.styleInline_ "display:flex;"] 
-            [ H.div_ [P.className "skill-box"] 
-              (buildSkills (_isPlayerTurn m) (_selectedSkill m) moves)
-            , H.div_ 
-              (computeAccess (not isPlayerTurn) 
-                [P.className "info-box"
-                , H.onClick ProcessTurn
+          case (_combatStatus m) of
+            combat@(Combat (Player (Stat name hp _ moves _)) enemies) ->       
+              [ H.div_ [P.className "enemy-space"] 
+                (buildEnemyBox (_isPlayerTurn m) (_selectedSkill m) enemies)
+              , H.div_ [P.className "bottom-box", CSS.styleInline_ "display:flex;"] 
+                [ H.div_ [P.className "skill-box"] 
+                  (buildSkills (_isPlayerTurn m) (_selectedSkill m) moves)
+                , H.div_ 
+                  (computeAccess (not (_isPlayerTurn m)) 
+                    [P.className "info-box"
+                    , H.onClick AccelerateTurn
+                    ]
+                  )
+                  [ H.p_ [P.className "texts"] [text $ ms name]
+                  , H.br_ []
+                  , H.p_ [P.className "texts"] [text $ ms ("HP: "  ++ (show hp))]
+                  , H.br_ []
+                  , H.p_ [P.className "texts"] [text $ ms (_combatInfo m)]
+                  ]
                 ]
-              )
-              [ H.p_ [P.className "texts"] [text $ ms name]
-              , H.br_ []
-              , H.p_ [P.className "texts"] [text $ ms ("HP: "  ++ (show hp))]
-              , H.br_ []
-              , H.p_ [P.className "texts"] [text $ ms (_combatInfo m)]
               ]
-            ]
-          ]
+            _ ->
+              [ H.div_ [P.className "combat-alert", H.onClick InitiateCombat]
+                [ H.div_ [] 
+                  [ H.p_ [P.className "texts"] 
+                    [ text [r|////////////////////////////// //////////////
+                      //////////////////// ///////////////////|]
+                    ]
+                  , H.br_ []
+                  , H.p_ [P.className "texts"] 
+                    [ text [r|-------------------------YOU LOST
+                      ------------------------------|]]
+                  , H.br_ []
+                  , H.p_ [P.className "texts"] 
+                    [ text [r|////////////// //////////////////
+                      ////////////////////// //////////////////////// ///|]]
+                  ]  
+                ]
+              ]
 
 buildEnemyBox :: Bool -> String -> [Combat Stat] -> [View Model Action]
 buildEnemyBox isPlayerTurn selectedSkill [] = []
+buildEnemyBox isPlayerTurn selectedSkill (x@(Corpse (Stat name hp _ _ source)):enemies)
+  = (buildEnemyBox isPlayerTurn selectedSkill enemies)
 buildEnemyBox isPlayerTurn selectedSkill (x@(Enemy (Stat name hp _ _ source)):enemies)
   = (H.div_ 
       (computeAccess isPlayerTurn

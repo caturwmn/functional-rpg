@@ -240,7 +240,8 @@ updateModel action = do
                 (randDouble, newRandomGen) = random gen :: (Double, StdGen)
 
                 -- Enemy perform random attack
-                moveName = selectRandomly randDouble moves
+                moveAmount = fromIntegral (length moves) :: Double
+                moveName = selectRandomly (randDouble * moveAmount) moves
                 selectedMove = getMove moveName moveList
                 currentStatus = (model ^. combatStatus)
                 nextStatus = currentStatus >>= (attack "player" selectedMove)
@@ -484,22 +485,23 @@ onLose = Scenario
   ]
 
 -- StatusEffect
-mark = DamageStatus "mark" "All" 1.5
+mark = DamageStatus "mark" "All" 1.25
 vulnerable = DamageStatus "vulnerable" "All" 2.0
 cureMark = StatusCleanse "mark" 
 
 -- Moves
 slash = Attack "slash" "slash" [] 5.0
-shieldStrike = Attack "shield strike" "slash" [vulnerable] 8.0
+shieldStrike = Attack "shield strike" "slash" [vulnerable] 3.0
 shoot = Attack "shoot" "pierce" [] 4.0
 bite = Attack "bite" "pierce" [mark] 1.0
+scratch = Attack "scratch" "slash" [] 2.0
 
 player :: Combat Stat
-player = Player (Stat "player" 10.0 [] ["Shield Strike", "Slash"] "")
+player = Player (Stat "player" 15.0 [] ["Shield Strike", "Slash"] "")
 
 enemy :: Combat Stat
-enemy = Enemy (Stat "wolf 1" 10.0 [] ["Bite"] "static/wolf.png")
-enemy2 = Enemy (Stat "wolf 2" 10.0 [] ["Bite"] "static/wolf.png")
+enemy = Enemy (Stat "wolf 1" 10.0 [] ["Bite", "Scratch"] "static/wolf.png")
+enemy2 = Enemy (Stat "wolf 2" 10.0 [] ["Bite", "Scratch"] "static/wolf.png")
 
 combatScenario :: Combat Stat
 combatScenario = Combat player [enemy, enemy2]
@@ -509,4 +511,5 @@ moveList = MoveList
   [ MoveElement "Slash" slash
   , MoveElement "Shield Strike" shieldStrike
   , MoveElement "Bite" bite
+  , MoveElement "Scratch" scratch
   ]

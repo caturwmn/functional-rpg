@@ -1,5 +1,5 @@
 # Functional-RPG
-Repository containing a simple rpg made using Haskell Miso. Requires GHCJS, GHCup, and Caball to compile as releasable build. You're welcome to try experimenting with these code to build your own game.
+Repository containing an attempt to recreate simple rpg features with functional programming paradigm. Requires GHCJS, GHCup, and Caball to compile as releasable build. You're welcome to try experimenting with these code to expand the features.
 
 ## Important
 Haskell Miso uses GHCJS to compile the app, therefore requiring linux. If you're using windows, it is recommended to try to install wsl by following [microsoft's guide on installing wsl](https://learn.microsoft.com/en-us/windows/wsl/install). You may also need to install Haskell, Caball, and GHCJS from [ghcup](https://www.haskell.org/ghcup/) or by using [nix](https://nixos.org/)
@@ -71,7 +71,7 @@ viewModel m =
       ]
     ]
 ```
-which is equivalent to
+which is equivalent to:
 ```html
 <html>
 <head>
@@ -137,8 +137,30 @@ which is equivalent to:
 ```
 
 ## Models
-Model module is currently being refactored and is unstable. Will be fixed in future updates
+Model module stores most of the logical operation used by the app. There are various functions that are important for a haskell miso app.
+
+### model
+The model structure handles most of the app's state. An initial model is required to start the app.
+
+### miso lenses
+Miso lenses allow abstraction of get and set operation for model fields. This also allows the values from the field to be accessed without declaring a pointer to the model
+
+### action
+This stores the possible action that can be triggered by the view layer and optionally side effects that may be triggered by update model function. It is commonly used for case syntax in update model to tell it what to do given an action.
+
+### updateModel
+The updateModel function will handle all action calls from the view/Virtual DOM layer. This function will return a new model that stores the new state for the app after an action is called and optionally introduces side effect which can be another action.
 
 ## Others
 ### cabal.project
 ### app-name.cabal
+
+## Functional Programming Implementation
+There are a few examples of functional programming technique used in this app.
+
+### High Order Functions
+### Recursion Over Iteration
+### Monad, Applicative, Functor
+### Immutability, Mutability and Side Effects
+### Function Composition and Fold
+### Strict Typing and Pattern Matching

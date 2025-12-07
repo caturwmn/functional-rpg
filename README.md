@@ -201,39 +201,39 @@ updateTurnOrder (x:_) (Combat player enemies) =
           case y of
             (Player (Stat  name _ _ _)) ->
               | target == name == y:ys
-              | otherwise = cycleTillMatch (ys ++ [y])
+              | otherwise = cycleTillMatch target (ys ++ [y])
             (Enemy (Stat name _ _ _ _)) ->
               | target == name == y:ys
-              | otherwise = cycleTillMatch (ys ++ [y])
+              | otherwise = cycleTillMatch target (ys ++ [y])
             (Corpse (Stat name _ _ _ _)) ->
               | target == name == y:ys
-              | otherwise = cycleTillMatch (ys ++ [y])
+              | otherwise = cycleTillMatch target (ys ++ [y])
     (Enemy (Stat target _ _ _ _)) -> cycleTillMatch target player:enemies
       where
           cycleTillMatch target (y:ys)
             case y of
               (Player (Stat  name _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatch target (ys ++ [y])
               (Enemy (Stat name _ _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatch target (ys ++ [y])
               (Corpse (Stat name _ _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatch target (ys ++ [y])
     (Corpse (Stat target _ _ _ _)) -> cycleTillMatch target player:enemies
       where
           cycleTillMatch target (y:ys)
             case y of
               (Player (Stat  name _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatch target (ys ++ [y])
               (Enemy (Stat name _ _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatc target (ys ++ [y])
               (Corpse (Stat name _ _ _ _)) ->
                 | target == name == y:ys
-                | otherwise = cycleTillMatch (ys ++ [y])
+                | otherwise = cycleTillMatch target (ys ++ [y])
 ```
 
 It can be declared as this:

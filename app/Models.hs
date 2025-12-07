@@ -343,11 +343,13 @@ removeStatus (StatusCleanse target) (x@(DamageStatus name _ _):xs)
 
 -- | To get damage multiplier from statuses
 getMultiplier :: String -> [StatusEffect] -> Double
-getMultiplier target [] = 1
-getMultiplier target (x@(DamageStatus name aType multiplier):xs)
-  | aType == "All" = multiplier * (getMultiplier target xs)
-  | target == aType = multiplier * (getMultiplier target xs)
-  | otherwise = 1.0 * (getMultiplier target xs)
+getMultiplier target statuses=
+  foldl checkMultiplier 1.0 statuses
+  where
+    checkMultiplier total (DamageStatus _ aType multiplier)
+      | aType == "All"   = total * multiplier
+      | aType == target  = total * multiplier
+      | otherwise        = total
 
 data Move
   -- name afflicted-status damage
@@ -426,12 +428,9 @@ instance Applicative Combat where
     Combat (p1 <*> p2) [x <*> y | x <- fs, y <- as]
 
 instance Monad Combat where
-  Player a >>= f =
-    f a
-  Enemy a >>= f =
-    f a
-  Corpse a >>= f =
-    f a
+  Player a >>= f = f a
+  Enemy a >>= f = f a
+  Corpse a >>= f = f a
   Combat player enemies >>= f = 
     Combat (player >>= f) (fmap (>>= f) enemies)
 

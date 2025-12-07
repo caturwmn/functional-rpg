@@ -151,16 +151,211 @@ This stores the possible action that can be triggered by the view layer and opti
 ### updateModel
 The updateModel function will handle all action calls from the view/Virtual DOM layer. This function will return a new model that stores the new state for the app after an action is called and optionally introduces side effect which can be another action.
 
-## Others
-### cabal.project
-### app-name.cabal
-
 ## Functional Programming Implementation
 There are a few examples of functional programming technique used in this app.
 
-### High Order Functions
-### Recursion Over Iteration
-### Monad, Applicative, Functor
-### Immutability, Mutability and Side Effects
-### Function Composition and Fold
-### Strict Typing and Pattern Matching
+### High Order Function
+High order functions are function that use function as an input, output, or both. They simplify the creation of complex functions that can perform operations on nested data structure like lists. They also allow complex function to be separated as simpler functions and can make the function more readable. For example, damage multiplier calculation is like this:
+```haskell
+-- | To get damage multiplier from statuses
+getMultiplier :: String -> [StatusEffect] -> Double
+
+-- Normal way
+getMultiplier target [] = 1
+getMultiplier target (x@(DamageStatus name aType multiplier):xs)
+  | aType == "All" = multiplier * (getMultiplier target xs)
+  | target == aType = multiplier * (getMultiplier target xs)
+  | otherwise = 1.0 * (getMultiplier target xs)
+
+-- High Order Function
+getMultiplier target statuses=
+  foldl checkMultiplier 1.0 statuses
+  where
+    -- Check multiplier definition
+    checkMultiplier total (DamageStatus _ aType multiplier)
+      | aType == "All"   = total * multiplier
+      | aType == target  = total * multiplier
+      | otherwise        = total
+``` 
+High Order Functions also allows abstraction and reuse of functions to do different things like with foldl:
+```haskell
+-- sum all content of list
+foldl (+) 0 [3,5,1]
+-- 3 + 5 + 1 + 0 = 9
+
+-- multiply all content of list
+foldl (*) 1 [3,5,1]
+-- 3 * 5 * 1 * 1 = 15
+```
+
+### Function Composition
+Function composition is the act of combining multiple functions to create a more complex function. Like high order function, This allows complex function to be separated into multiple simpler function and can make the function more readable. For example, in the function to update turn order, rather than this:
+```haskell
+-- Build new turn order
+updateTurnOrder :: [Combat Status] -> Combat Status -> [Combat Status]
+updateTurnOrder (x:_) (Combat player enemies) = 
+  case x of
+    (Player (Stat target _ _ _ _)) -> cycleTillMatch target player:enemies
+      where
+        cycleTillMatch target (y:ys)
+          case y of
+            (Player (Stat  name _ _ _)) ->
+              | target == name == y:ys
+              | otherwise = cycleTillMatch (ys ++ [y])
+            (Enemy (Stat name _ _ _ _)) ->
+              | target == name == y:ys
+              | otherwise = cycleTillMatch (ys ++ [y])
+            (Corpse (Stat name _ _ _ _)) ->
+              | target == name == y:ys
+              | otherwise = cycleTillMatch (ys ++ [y])
+    (Enemy (Stat target _ _ _ _)) -> cycleTillMatch target player:enemies
+      where
+          cycleTillMatch target (y:ys)
+            case y of
+              (Player (Stat  name _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+              (Enemy (Stat name _ _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+              (Corpse (Stat name _ _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+    (Corpse (Stat target _ _ _ _)) -> cycleTillMatch target player:enemies
+      where
+          cycleTillMatch target (y:ys)
+            case y of
+              (Player (Stat  name _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+              (Enemy (Stat name _ _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+              (Corpse (Stat name _ _ _ _)) ->
+                | target == name == y:ys
+                | otherwise = cycleTillMatch (ys ++ [y])
+```
+
+It can be declared as this:
+```haskell
+getStatName :: (Combat Stat) -> String
+getStatName (Player (Stat name _ _ _ _)) = name
+getStatName (Enemy (Stat name _ _ _ _)) = name
+getStatName (Corpse (Stat name _ _ _ _)) = name
+
+nameMatches :: (Combat Stat) -> (Combat Stat) -> Bool
+nameMatches target current = (getStatName target) == (getStatName current)
+
+cycleTillMatch :: (Combat Stat) -> [Combat Stat] -> [Combat Stat]
+cycleTillMatch target (x:xs)
+  | nameMatches target x = x:xs
+  | otherwise = cycleTillMatch target (xs ++ [x])
+
+buildTurnOrder :: (Combat Stat) -> [Combat Stat]
+buildTurnOrder (Combat player enemies)
+  = player:enemies
+
+-- Build new turn order
+updateTurnOrder :: [Combat Status] -> Combat Status -> [Combat Status]
+updateTurnOrder turnOrder currentState
+  = cycleTillMatch (getHead turnOrder) (buildTurnOrder currentState)
+```
+
+### Functor, Applicative, and Monad
+This app uses a custom monad instance for Combat data type that stores the main combat state for this app.
+#### Functor
+Functor allows the passing of a function to a value inside another data. This value can be another data or a list of data. The function used to apply a function in haskell is fmap which is another example of high order function.
+```haskell
+class Functor f where
+  fmap :: (a -> b) -> f a -> f b
+```
+An example of the usage of fmap is this:
+```haskell
+-- To increment the values stored in a list
+incList :: [Num] -> Num
+
+-- Normal way
+incList [] = []
+incList list@(x:xs) = (x+1):(sumList xs)
+
+-- With fmap (which is map for list)
+incList list = fmap (+1) list
+```
+In this app, this is the declaration of functor instance for Combat data type:
+```haskell
+-- fmap applies function f on the value 
+-- stored within Combat Functor
+instance Functor Combat where
+  fmap f (Player a) = Player (f a)
+  fmap f (Enemy a) = Enemy (f a)
+  fmap f (Combat player enemies) 
+    = Combat (fmap f player) (map (fmap f) enemies)
+```
+The declaration of functor instance is necessary if you want to create a custom monad or applicative. 
+#### Applicative
+Applicative allows the passing of a function inside a data to a value inside another data of the same type. In Haskell, applicative is also a functor. This is usually done via (<*>) operator. This is also where pure function which is the default constructor for a given inner value of functor, applicative, and monad is declared.
+```haskell
+-- (a -> b) is the function stored
+-- in applicative f
+-- a is the inner value of applicative
+class Functor f => Applicative f where
+  pure  :: a -> f a
+  (<*>) :: f (a -> b) -> f a -> f b
+```
+In Haskell, list is also an applicative. For example, an applicative operation between a list of function and a list of integer are like this:
+```haskell
+[(*0),(+100),(^2)] <*> [1,2,3]
+-- [1*0, 2*0, 3*0] ++ 
+-- [1+100, 2+100, 3+100] ++ 
+-- [1^2,2^2,3^2]
+-- [0,0,0,101,102,103,1,4,9]
+```
+In this app, this is the declaration of applicative instance for Combat data type.
+```haskell
+instance Applicative Combat where
+  pure x = Combat (Player x) []
+  (Player f) <*> (Player a) = Player (f a)
+  (Enemy f) <*> (Enemy a) = Enemy (f a)
+  (Combat p1 fs) <*> (Combat p2 as) = 
+    Combat (p1 <*> p2) [x <*> y | x <- fs, y <- as]
+```
+In this app, applicative's operation is not used but is necessary to be declared for Combat data type to create Combat monad.
+
+#### Monad
+Monad allows a data to receive a chain of operation that affects the data. This is the one of the main way that data that store states are operated in haskell. Monad allows this chain of operation via bind (>>=) which takes a function that create the same type of monad from the values of another monad.
+```haskell
+-- (a -> m b) is a function that create
+-- another monad of type m from the values
+-- inside m which is a
+class Applicative m => Monad m where
+  (>>=)  :: m a -> (a -> m b) -> m b
+  return :: a -> m a
+```
+In this app, this is the declaration of monad instance for Combat data type.
+```haskell
+instance Monad Combat where
+  Player a >>= f = f a
+  Enemy a >>= f = f a
+  Corpse a >>= f = f a
+  Combat player enemies >>= f = 
+    Combat (player >>= f) (fmap (>>= f) enemies)
+```
+An example of operation that will change the state of combat is attack which is used to perfrom an attack to a target in Combat state:
+```haskell
+attack :: String -> Move -> Stat -> (Combat Stat)
+attack target move@(Attack _ aType _ damage) stat@(Stat name hp statuses _ _)
+  | hp <= 0.0
+    = Corpse stat
+  | target == name
+    = checkAlive (reduceHP hp damage aType statuses) move stat
+  | name == "player"
+    = Player stat
+  | otherwise 
+    = Enemy stat
+```
+When this happens:
+``` haskell
+nextCombatStatus = 
+  currentCombatStatus >>= (attack target selectedMove)
+```
+What will happen is Combat will map the attack function to the player and all enemies and if the name matches the target name, the player or enemy will reduced. 
